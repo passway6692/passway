@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  DRIVER
+  ADMIN
+}
+
+enum CarStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingType {
+  SINGLE
+  DOUBLE
+  TRIPLE
+}
+
+enum TripStatus {
+  OPEN //   less than 3 members
+  FULL //   3 members
+  ASSIGNED //  Driver accepted
+  STARTED
+  COMPLETED //  Trip completed
+  CANCELLED // trip cancelled  
+  EXPIRED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model User {
+  id String @id @default(uuid())
+
+  phone                String                @unique
+  password             String
+  name                 String
+  image                String?
+  gender               Gender                @default(MALE)
+  fcmTokens            FcmToken[]
+  role                 Role                  @default(USER)
+  car                  Car?
+  approvals            CarApproval[]
+  refreshTokens        RefreshToken[]
+  balance              Float                 @default(0)
+  userBonus            Float                 @default(200)
+  location             String?
+  lat                  Float?
+  lng                  Float?
+  moneyTransactions    MoneyTransaction[]
+  //Trips relations
+  createdTrips         Trip[]                @relation("UserCreatedTrips") //   Trips created by a user
+  joinedTrips          TripMember[] //    Trips users join to them
+  driverTrips          Trip[]                @relation("DriverTrips")
+  withdrawTransactions WithdrawTransaction[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  reviews              TripReview[]
+  
+  averageRating        Float? @default(5.0)
+}
+
+model Car {
+  id                      String        @id @default(uuid())
+  brand                   String      
+  model                   String      
+  year                    Int         
+  color                   String      
+  driverLicenseExpiryDate DateTime
+  carPlate                String        @unique
+  carPhotoFront           String
+  driverLicensePhotoFront String
+  driverLicensePhotoBack  String
+  carLicensePhotoFront    String
+  carLicensePhotoBack     String
+  idCardPhotoFront        String
+  idCardPhotoBack         String
+  status                  CarStatus     @default(PENDING)
+  driverId                String        @unique
+  driver                  User          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  approvals               CarApproval[]
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CarApproval {
+  id        String   @id @default(uuid())
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  approved  Boolean
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Trip {
+  id        String @id @default(uuid())
+  //user
+  creatorId String
+  creator   User   @relation("UserCreatedTrips", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  driverId String?
+  driver   User?   @relation("DriverTrips", fields: [driverId], references: [id], onDelete: SetNull)
+
+  fromLat            Float
+  fromLng            Float
+  toLat              Float
+  toLng              Float
+  from               String
+  to                 String
+  startTime          String
+  endTime            String?
+  status             TripStatus   @default(OPEN)
+  isPaid             Boolean      @default(false)
+  seatsRequested     Int          @default(1) //  1=>3
+  tripDates          String // ["16-10-2025","18-10-2025",...]
+  bookingType        BookingType  @default(TRIPLE)
+  userHasEnoughMoney Boolean      @default(false)
+  members            TripMember[]
+  reviews            TripReview[]
+  //price
+  totalFare          Float?
+  driverShare        Float?
+  appCommission      Float?
+  duration           Float //in minutes
+  distance           Float //in km
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  notified8hAt       DateTime? //    
+  notified30mPayment Boolean   @default(false)
+  notified15mPayment Boolean   @default(false)
+  paymentDeadlineMet Boolean   @default(false)
+
+  @@index([from])
+  @@index([to])
+  @@index([startTime])
+  @@index([status])
+}
+
+model TripMember {
+  id            String @id @default(uuid())
+  tripId        String
+  userId        String
+  passengerFare Float
+
+  pickupLat   Float
+  pickupLng   Float
+  dropLat     Float
+  dropLng     Float
+  seatsBooked Int   @default(1)
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tripId, userId]) // user can't join twice to a trip
+}
+
+model Setting {
+  id           String  @id @default(uuid())
+  minimumFare  Float   @default(50)
+  appCommission Float  @default(0.1)
+  userBonus    Float   @default(200)
+}
+
+model BookingTypeSetting {
+  id           String  @id @default(uuid())
+  bookingType  String  @unique  // "SINGLE", "DOUBLE", "TRIPLE"
+  baseFare     Float
+  perKmRate    Float
+}
+model FcmToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum MoneyTransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model MoneyTransaction {
+  id            Int                    @id @default(autoincrement())
+  screen        String?
+  phone         String
+  reference     String
+  status        MoneyTransactionStatus @default(PENDING)
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id])
+  shippingPrice Float?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+}
+
+model WithdrawTransaction {
+  id            Int                    @id @default(autoincrement())
+  screen        String? // "withdraw"
+  paymentMethod String // وسيلة الدفع (مثلاً: Vodafone Cash, Bank, ...etc)
+  receiverPhone String // رقم الشخص اللي هيستقبل المبلغ
+  receiverName  String? // اسم الشخص صاحب الرقم
+  reference     String // كود أو رقم مرجعي للعملية
+  status        MoneyTransactionStatus @default(PENDING) // PENDING / SUCCESS / FAILED
+  amount        Float // المبلغ المطلوب سحبه
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id])
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+}
+
+model TripReview {
+  id     String @id @default(uuid())
+  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  rating      Int
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

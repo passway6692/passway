@@ -904,7 +904,6 @@ export async function getTripDetails(req: FullRequest, res: Response) {
 
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
-
       include: {
         members: {
           select: {
@@ -919,7 +918,6 @@ export async function getTripDetails(req: FullRequest, res: Response) {
             seatsBooked: true,
             createdAt: true,
             updatedAt: true,
-
             user: {
               select: {
                 id: true,
@@ -951,21 +949,23 @@ export async function getTripDetails(req: FullRequest, res: Response) {
         error: t(lang, "trip.not_found"),
       });
     }
+
+    const formatRating = (rating: number | null): number => {
+      if (!rating) return 0.0;
+      return Number(Number(rating).toFixed(1));
+    };
+
     const formattedMembers = trip.members.map((m) => ({
       ...m,
       user: {
         ...m.user,
-        averageRating: m.user.averageRating
-          ? parseFloat(Number(m.user.averageRating).toFixed(1))
-          : 0.0,
+        averageRating: formatRating(m.user.averageRating),
       },
     }));
 
     const formattedDriver = {
       ...trip.driver,
-      averageRating: trip.driver?.averageRating
-        ? parseFloat(Number(trip.driver.averageRating).toFixed(1))
-        : 0.0,
+      averageRating: formatRating(trip.driver?.averageRating || null),
     };
 
     return res.json({

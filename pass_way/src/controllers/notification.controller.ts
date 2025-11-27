@@ -10,7 +10,7 @@ import z from "zod";
 import { t } from "../utils/i18n";
 import { FullRequest } from "../types/request";
 import { sendNotificationWithDelay } from "../utils/sendNotification";
-
+import { TripStatus } from "@prisma/client";
 export const registerToken = async (req: Request, res: Response) => {
   const { userId, token, device } = req.body;
   if (!userId || !token)
@@ -114,3 +114,37 @@ export const sendNotificationToAll = async (
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+
+export async function getPublicFullTripsCount(req: Request, res: Response) {
+  const lang = (req as any).lang || "ar";
+
+  try {
+    const now = new Date();
+
+    const filters = {
+      status: "FULL" as TripStatus,
+      userHasEnoughMoney: true,
+      startTime: { gte: now.toISOString() },
+    };
+
+    const totalCount = await prisma.trip.count({
+      where: filters
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalCount,
+      },
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      error: t(lang, "errors.server_error"),
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}

@@ -40,34 +40,32 @@ export async function sendNotificationToUser(
 ) {
   const tokens = await getTokensByUser(userId);
   if (!tokens.length) return console.log("⚠️ No tokens for user:", userId);
+  const message: any = {
+    notification: { title, body },
+    data,
+    tokens,
+ android: {
+      notification: {
+        sound: defaultSoundAndroid,
+        imageUrl,
+        channelId: "channel_id", 
+      },
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: defaultSoundIOS,
+          "mutable-content": 1,
+        },
+      },
+      fcm_options: { image: imageUrl },
+    },
+  };
 
-const message: any = {
-  tokens,
-  data: {
-    title,
-    body,
-    image: imageUrl,
-    ...data
-  },
 
-  android: {
-    priority: "high",
-    notification: {
-      channelId: "channel_id",
-      sound: defaultSoundAndroid,
-      imageUrl,
-    }
-  },
 
-  apns: {
-    payload: {
-      aps: {
-        sound: defaultSoundIOS,
-        "mutable-content": 1
-      }
-    }
-  }
-};
+  
+
 
 
   const response = await admin.messaging().sendEachForMulticast(message);

@@ -183,15 +183,12 @@ export async function findNearbyTrips(
     tripData;
 
   // نحسب نطاق الوقت المسموح بالبحث فيه (مثلاً ±12 ساعة)
-  const searchDate = new Date(startTime);
-  const timeWindowStart = new Date(
-    searchDate.getTime() - RETURN_TIME_WINDOW_MS
-  ).toISOString();
-  const timeWindowEnd = new Date(
-    searchDate.getTime() + RETURN_TIME_WINDOW_MS
-  ).toISOString();
+const searchDate = new Date(startTime);
+const THIRTY_MINUTES = 30 * 60 * 1000;
+const timeWindowStart = new Date(searchDate.getTime() - THIRTY_MINUTES).toISOString();
+const timeWindowEnd = new Date(searchDate.getTime() + THIRTY_MINUTES).toISOString();
 
-  // نجيب كل الرحلات المفتوحة اللي في نفس الوقت تقريبًا
+
   const openTrips = await prisma.trip.findMany({
     where: {
       status: "OPEN",
